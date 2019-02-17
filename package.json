@@ -1,0 +1,25 @@
+{
+  "name": "h5mirror",
+  "version": "1.0.0",
+  "description": "xky h5mirror",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XKSoft/h5mirror.git"
+  },
+  "keywords": [
+    "h5mirror"
+  ],
+  "author": "xiaoxia",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/XKSoft/h5mirror/issues"
+  },
+  "homepage": "https://github.com/XKSoft/h5mirror#readme",
+  "dependencies": {
+    "express": "^4.16.4"
+  }
+}
