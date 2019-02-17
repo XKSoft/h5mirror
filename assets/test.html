@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>DEMO</title>
     <link href="css/bootstrap.css" rel="stylesheet">
+    <link href="css/main.css" rel="stylesheet">
     <style>
         p {
             line-height: 4em;
@@ -16,50 +17,68 @@
     </style>
 </head>
 <body>
+
 <div id="app" style="margin: 1em;">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
 
-    <div class="row">
-        <div class="col-md-6">
 
+                <div class="panel panel-primary" style="width:434px;">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">手机屏幕</h3>
+                    </div>
 
-            <div class="panel panel-primary">
-                <div class="panel-heading">
-                    <h3 class="panel-title">手机屏幕</h3>
+                    <div class="panel-body" style="position:relative; margin: 0;padding: 0;height: 768px;   background:url(images/mirrorbg.png) no-repeat;">
+                        <div id="mirror" style="display:none;"></div>
+                        <div class="spinner" id="loading" style="position:absolute;top:48%;left:48%;display:none;">
+                            <div class="rect1"></div>
+                            <div class="rect2"></div>
+                            <div class="rect3"></div>
+                            <div class="rect4"></div>
+                            <div class="rect5"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row" style="width:434px; margin: 0;padding: 0;">
+                    <div class="col-md-4 text-center">
+                        <button type="button" class="btn btn-default" @click="sendEvent({ type: 'device_button', name: 'code', key: 4})">back</button>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <button type="button" class="btn btn-default" @click="sendEvent({ type: 'device_button', name: 'code', key: 3})">home</button>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <button type="button" class="btn btn-default" @click="sendEvent({ type: 'device_button', name: 'code', key: 187})">app</button>
+                    </div>
                 </div>
 
-                <div class="panel-body" style=" margin: 0;padding: 0;">
-                    <div id="mirror" style="height: 800px"></div>
+            </div>
+            <div class="col-md-6">
+                <div class="panel panel-success">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">连接</h3>
+                    </div>
+                    <div class="panel-body">
+                        <p>
+                            <textarea rows="10" class="form-control" v-model="device_info"></textarea>
+                        </p>
+                        <p>
+                            <button type="button" class="btn btn-primary" @click="connectDevice">连接设备</button>
+                        </p>
+                    </div>
+                </div>
+
+
+                <div class="panel panel-success">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">日志</h3>
+                    </div>
+                    <div class="panel-body">
+                        <pre>{{api_result}}</pre>
+                    </div>
                 </div>
             </div>
-
-
         </div>
-        <div class="col-md-6">
-            <div class="panel panel-success">
-                <div class="panel-heading">
-                    <h3 class="panel-title">登陆</h3>
-                </div>
-                <div class="panel-body">
-                    <p>
-                        <input class="form-control" rows="10" v-model="device_sn"></input>
-                    </p>
-                    <p>
-                        <button type="button" class="btn btn-primary" @click="connectDevice">连接设备</button>
-                    </p>
-                </div>
-            </div>
-
-
-            <div class="panel panel-success">
-                <div class="panel-heading">
-                    <h3 class="panel-title">返回内容</h3>
-                </div>
-                <div class="panel-body">
-                    <pre>{{api_result}}</pre>
-                </div>
-            </div>
-        </div>
-
     </div>
 </div>
 
@@ -80,13 +99,15 @@
     var app = new Vue({
         el: '#app',
         data: {
-            device_sn: '',
+            device_info: '',
             api_result: 'null',
             mirror_socket: null,
             player: null,
             lastEvent: null,
             mirrorWidth: 432,
-            mirrorHeight: 768
+            mirrorHeight: 768,
+            log_lines: new Array(20),
+            first_mirror: true
         },
         methods: {
             post: async (api, json, session) => {
@@ -101,81 +122,47 @@
                 }
             },
             connectDevice: async () => {
+                let device = JSON.parse(app.device_info);
 
-                app.setCookie("device_sn", app.device_sn);
-                //登陆获取session，这个可以放后端，这里为了方便直接放到流程中
-                let login = await app.post("login", {
-                    'key': 'xky',
-                    'account': 'test@qq.com',
-                    'password': 'aa112233',
-                    'source': true
-                }, null);
-                if (!login.data.session) {
-                    app.api_result = "登陆失败";
+                if (!device.host) {
+                    app.log("貌似数据不正确或者节点未设置转发..");
                     return;
                 }
-
-                //获取设备连接信息，每次和设备连接都要执行一次以获取最新信息
-                let device = await app.get("get_device?sn=" + app.device_sn, login.data.session);
-                if (device.data.errcode != 0) {
-                    app.api_result = device.data;
-                    return;
-                }
-
-                if (!device.data.t_online) {
-                    app.api_result = "当前设备已离线";
-                    return;
-                }
-
-                if (!device.data.t_nodeurl) {
-                    app.api_result = "设备节点未设置数据转发";
-                    return;
-                }
-                app.api_result = device.data;
-
-                //初始化画布
-                if (!app.player) {
-                    app.player = new Player({
-                        size: {width: app.mirrorWidth, height: app.mirrorHeight},
-                        useWorker: true,
-                        workerFile: '/js/Decoder.js',
-                        webgl: "auto"
-                    });
-                    //触动事件
-                    app.player.canvas.onmousedown = app.mousedown;
-                    app.player.canvas.onmouseup = app.mouseup;
-                    app.player.canvas.onmousemove = app.mousemove;
-                    //禁用右键菜单
-                    $('#mirror').bind('contextmenu', function () { return false; });
-                    $('#mirror').append(app.player.canvas);
-                }
+                app.first_mirror = true;
+                app.log("正在开始连接[" + device.sn + "]...");
+                $('#loading').fadeIn();
+                $('#mirror').fadeOut();
+                //格式化json
+                app.device_info = JSON.stringify(device, null, 4);
+                //保存cookie
+                app.setCookie("device_info", app.device_info);
 
                 //如果之前已连接，则先断开
                 if (app.socket) {
                     app.socket.disconnect(true);
                 }
-                app.socket = io(device.data.t_nodeurl, {
+                app.socket = io(device.host, {
                     "transports": ['websocket'],
                     "path": "/xky",
-                    "query": "sn=" + device.data.t_sn + "&action=mirror&hash=" + device.data.t_connection_hash
+                    "query": "sn=" + device.sn + "&action=mirror&hash=" + device.hash
                 }).on('connect', function () {
-                    console.log("连接上了");
+                    app.log("已连接[" + device.sn + "]...");
                 }).on('event', function (json) {
-                    console.log(json);
+                    app.log(JSON.stringify(json));
                 }).on('h264', function (data) {
                     app.player.decode(new Uint8Array(data));
                 }).on('disconnect', function () {
-                    console.log("断开了");
-                }).on('error', function (err) {
-                    console.log("出差错");
+                    app.log("已断开[" + device.sn + "]...");
+                    $('#loading').fadeIn();
+                    $('#mirror').fadeOut();
                 });
 
             },
-            setCookie: (c_name, value, expiredays) => {
+            setCookie: (c_name, value) => {
                 const exdate = new Date();
-                exdate.setDate(exdate.getDate() + expiredays);
+                exdate.setDate(exdate.getDate() + 365);
                 document.cookie = c_name + '=' + escape(value) +
-                    ((expiredays == null) ? '' : ';expires=' + exdate.toGMTString());
+                    ';expires=' + exdate.toGMTString();
             },
             getCookie: (c_name) => {
                 if (document.cookie.length > 0) {
@@ -235,11 +222,51 @@
                     x: (e.offsetX / app.player.canvas.width).toFixed(4),
                     y: (e.offsetY / app.player.canvas.height).toFixed(4)
                 });
+            },
+            log: (str) => {
+                for (let i = 0; i < app.log_lines.length; i++) {
+                    if (i != app.log_lines.length - 1) {
+                        if (app.log_lines[i + 1] && app.log_lines[app.log_lines.length - 1]) {
+                            app.log_lines[i] = app.log_lines[i + 1];
+                        }
+                    } else {
+                        app.log_lines[i] = null;
+                    }
+                    if (!app.log_lines[i]) {
+                        app.log_lines[i] = new Date().toLocaleTimeString() + " | " + str;
+                        break;
+                    }
+                }
+                app.api_result = app.log_lines.join("\r\n");
+            },
+            initPlayer: () => {
+                app.player = new Player({
+                    size: {width: app.mirrorWidth, height: app.mirrorHeight},
+                    useWorker: true,
+                    workerFile: '/js/Decoder.js',
+                    webgl: "auto"
+                });
+                //触动事件
+                app.player.canvas.onmousedown = app.mousedown;
+                app.player.canvas.onmouseup = app.mouseup;
+                app.player.canvas.onmousemove = app.mousemove;
+                //禁用右键菜单
+                $('#mirror').bind('contextmenu', function () { return false; });
+                $('#mirror').append(app.player.canvas);
+
+                app.player.onPictureDecoded = function () {
+                    if (app.first_mirror) {
+                        app.first_mirror = false;
+                        $('#loading').fadeOut();
+                        $('#mirror').fadeIn();
+                        app.log("已解析出画面...");
+                    }
+                };
             }
         }
     });
 
-    app.device_sn = app.getCookie("device_sn");
+    app.device_info = app.getCookie("device_info");
 
-
+    app.initPlayer();
 </script>
